@@ -1098,6 +1098,16 @@ register_ignore_layers(
     ],
 )
 
+register_ignore_layers(
+    matchers=[
+        ModelTypeMatcher(r"qwen3_omni_moe", mode="full"),
+    ],
+    ignore_layers=[
+        "talker",
+        "code2wav",
+    ],
+)
+
 
 def get_bagel_ignore_layers(model) -> list[str]:
     """Keep BAGEL generation-path modules in FP16.

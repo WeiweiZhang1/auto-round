@@ -341,6 +341,7 @@ def eval_task_by_task(
     retry_times=3,
     mllm=False,
     add_bos_token=False,
+    gen_kwargs=None,
 ):
     require_version(
         "lm_eval>=0.4.2", "lm-eval is required for evaluation, please install it with `pip install 'lm-eval>=0.4.2'`"
@@ -403,7 +404,7 @@ def eval_task_by_task(
             add_bos_token=add_bos_token,
         )
 
-    _evaluate_tasks_with_retry(tasks, hflm, device_str, batch_size, limit, retry_times)
+    _evaluate_tasks_with_retry(tasks, hflm, device_str, batch_size, limit, retry_times, gen_kwargs=gen_kwargs)
 
 
 def _load_gguf_model_if_needed(model_path, eval_model_dtype=None):
@@ -458,7 +459,7 @@ def _load_gguf_model_if_needed(model_path, eval_model_dtype=None):
     return model, tokenizer, is_gguf_file, gguf_file
 
 
-def _evaluate_tasks_with_retry(tasks, hflm, device_str, batch_size, limit, retry_times):
+def _evaluate_tasks_with_retry(tasks, hflm, device_str, batch_size, limit, retry_times, gen_kwargs=None):
     """Evaluate tasks with automatic retry on OOM errors.
 
     Args:
@@ -468,6 +469,8 @@ def _evaluate_tasks_with_retry(tasks, hflm, device_str, batch_size, limit, retry
         batch_size: Batch size for evaluation
         limit: Limit number of examples per task
         retry_times: Number of retry attempts on failure
+        gen_kwargs: Generation kwargs string forwarded to lm_eval for generative tasks
+            (e.g. ``"max_gen_toks=2048"``)
 
     Returns:
         Aggregated results dictionary containing results, versions, n-shot, and higher_is_better
@@ -492,7 +495,13 @@ def _evaluate_tasks_with_retry(tasks, hflm, device_str, batch_size, limit, retry
         while current_retry_times:
             try:
                 res = lm_eval.simple_evaluate(
-                    model=hflm, model_args=None, device=device_str, tasks=task, batch_size=batch_size, limit=limit
+                    model=hflm,
+                    model_args=None,
+                    device=device_str,
+                    tasks=task,
+                    batch_size=batch_size,
+                    limit=limit,
+                    gen_kwargs=gen_kwargs,
                 )
                 break
             except Exception as e:
@@ -506,7 +515,13 @@ def _evaluate_tasks_with_retry(tasks, hflm, device_str, batch_size, limit, retry
                             hflm.batch_sizes[k] = max(v // 2, 1)
                         logger.warning(f"Out of memory, reset batch_size to {hflm.batch_sizes} and re-try.")
                         res = lm_eval.simple_evaluate(
-                            model=hflm, model_args=None, device=device_str, tasks=task, batch_size=1, limit=limit
+                            model=hflm,
+                            model_args=None,
+                            device=device_str,
+                            tasks=task,
+                            batch_size=1,
+                            limit=limit,
+                            gen_kwargs=gen_kwargs,
                         )
                         hflm.batch_sizes = ori_batch_sizes
                     except Exception as e:
